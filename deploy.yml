@@ -1,0 +1,51 @@
+name: Deploy to GKE from GCR
+
+on:
+  push:
+    # Trigger on any push to branches that match "feature/**"
+    branches:
+      - 'feature/assignment'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository to access your Kubernetes manifests.
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Google Cloud SDK and authenticate using the service account.
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      # (Optional) Step 3: Configure Docker to use GCR.
+      # This is useful if you need to perform any Docker operations.
+      - name: Configure Docker for GCR
+        run: |
+          gcloud auth configure-docker
+
+      # Step 4: Get credentials for your GKE cluster.
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v0
+        with:
+          cluster_name: ${{ secrets.GKE_CLUSTER }}
+          location: ${{ secrets.GKE_ZONE }}
+          project_id: ${{ secrets.GCP_PROJECT }}
+
+      # Step 5: Deploy your Kubernetes manifests.
+      # Make sure your manifest (e.g., deployment.yaml) references your image from GCR,
+      # such as "gcr.io/${{ secrets.GCP_PROJECT }}/your-app:latest".
+      - name: Deploy to GKE
+        run: |
+          kubectl apply -f k8s/
+
+      # Step 6: Scale the deployment to run 5 replicas.
+      # Replace "my-app" with the actual name of your Kubernetes Deployment.
+      - name: Scale Deployment to 5 Replicas
+        run: |
+          kubectl scale deployment my-app --replicas=5
